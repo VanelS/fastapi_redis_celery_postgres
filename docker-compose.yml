@@ -1,0 +1,97 @@
+services:
+  # =======================================================
+  #  PostgreSQL — base de données
+  # =======================================================
+  db:
+    image: postgres:16-alpine
+    container_name: reports_db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =======================================================
+  #  Redis — broker Celery
+  # =======================================================
+  redis:
+    image: redis:7-alpine
+    container_name: reports_redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # =======================================================
+  #  FastAPI — API web
+  # =======================================================
+  api:
+    build: .
+    container_name: reports_api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    env_file: .env
+    volumes:
+      - ./app:/app/app          # hot-reload du code
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini 
+      - reports_data:/app/reports
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # =======================================================
+  #  Celery Worker — exécute les tâches
+  # =======================================================
+  worker:
+    build: .
+    container_name: reports_worker
+    command: celery -A app.worker.celery_app worker --loglevel=info --concurrency=2
+    env_file: .env
+    volumes:
+      - ./app:/app/app
+      - ./alembic.ini:/app/alembic.ini 
+      - reports_data:/app/reports
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  # =======================================================
+  #  Flower — UI de monitoring Celery
+  # =======================================================
+  flower:
+    build: .
+    container_name: reports_flower
+    command: celery -A app.worker.celery_app flower --port=5555
+    env_file: .env
+    volumes:
+      - ./app:/app/app
+      - ./alembic.ini:/app/alembic.ini
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+      - worker
+
+# =========================================================
+#  Volumes persistants
+# =========================================================
+volumes:
+  postgres_data:     # Les données de PostgreSQL survivent à un `down`
+  reports_data:      # Les PDF générés, partagés entre api et worker
