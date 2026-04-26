@@ -150,3 +150,47 @@ def get_report_status(
     )
 
     return report
+
+
+# =========================================================
+#  Download du rapport (une fois prêt)
+# =========================================================
+@app.get(
+    "/reports/{report_id}/download",
+    tags=["reports"],
+    summary="Télécharger le PDF d'un rapport COMPLETED",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Rapport introuvable"},
+        status.HTTP_409_CONFLICT: {"description": "Rapport pas encore prêt"},
+        status.HTTP_410_GONE: {"description": "Fichier disparu du serveur"},
+    },
+)
+def download_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+):
+    """Retourne le fichier PDF généré, en streaming."""
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rapport introuvable",
+        )
+
+    if report.status != ReportStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Le rapport est en statut '{report.status.value}', téléchargement impossible",
+        )
+
+    if not report.file_path or not Path(report.file_path).is_file():
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE,
+            detail="Le fichier du rapport n'existe plus sur le serveur",
+        )
+
+    return FileResponse(
+        path=report.file_path,
+        media_type="application/pdf",
+        filename=f"rapport_{report.title.replace(' ', '_')}_{report_id[:8]}.pdf",
+    )
