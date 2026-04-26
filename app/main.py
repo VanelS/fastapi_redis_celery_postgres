@@ -2,12 +2,16 @@
 Application FastAPI — point d'entrée HTTP du service.
 """
 from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List
 
+
+from pathlib import Path
+
 from app.config import settings
 from app.database import get_db
-from app.models import Report
+from app.models import Report, ReportStatus
 from app.schemas import ReportCreate, ReportResponse, ReportStatusResponse
 
 import logging
@@ -194,3 +198,58 @@ def download_report(
         media_type="application/pdf",
         filename=f"rapport_{report.title.replace(' ', '_')}_{report_id[:8]}.pdf",
     )
+
+
+# =========================================================
+#  Retry d'un rapport FAILED
+# =========================================================
+@app.post(
+    "/reports/{report_id}/retry",
+    response_model=ReportResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["reports"],
+    summary="Relancer un rapport en statut FAILED",
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Rapport introuvable"},
+        status.HTTP_409_CONFLICT: {"description": "Le rapport n'est pas en statut FAILED"},
+    },
+)
+def retry_report(
+    report_id: str,
+    db: Session = Depends(get_db),
+):
+    """
+    Réinitialise un rapport FAILED et relance la tâche Celery.
+    Le rapport reprend son cycle PENDING → PROCESSING → COMPLETED/FAILED.
+    """
+    # 1. Charger le rapport
+    report = db.query(Report).filter(Report.id == report_id).first()
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rapport introuvable",
+        )
+
+    # 2. Vérifier qu'il est bien en FAILED
+    if report.status != ReportStatus.FAILED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Retry impossible : le rapport est en statut '{report.status.value}', "
+                   f"seul un rapport FAILED peut être relancé",
+        )
+
+    # 3. Réinitialiser les champs du rapport
+    report.status = ReportStatus.PENDING
+    report.error_message = None
+    report.completed_at = None
+    report.file_path = None
+    db.commit()
+    db.refresh(report)
+
+    # 4. Relancer la tâche Celery
+    from app.tasks import generate_report
+    generate_report.delay(report.id)
+    logger.info(f"🔁 Retry du rapport {report.id} déclenché")
+
+    # 5. Retourner le rapport remis à PENDING
+    return report
