@@ -16,7 +16,6 @@ jobs:
   tests:
     name: 🧪 Run tests
     runs-on: ubuntu-latest
-    needs: lint
 
     # 🆕 Variables disponibles pour TOUS les steps du job
     env:
