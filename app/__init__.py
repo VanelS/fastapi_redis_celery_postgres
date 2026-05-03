@@ -1,2 +1,1 @@
-from app.models import Report # noqa: F401
-
+from app.models import Report  # noqa: F401

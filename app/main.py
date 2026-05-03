@@ -1,20 +1,19 @@
 """
 Application FastAPI — point d'entrée HTTP du service.
 """
-from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.responses import FileResponse
-from sqlalchemy.orm import Session
-from typing import List
 
-
+import logging
 from pathlib import Path
 
-from app.config import settings
+from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi.responses import FileResponse
+from sqlalchemy.orm import Session
+
+from app.config import get_settings
 from app.database import get_db
 from app.models import Report, ReportStatus
 from app.schemas import ReportCreate, ReportResponse, ReportStatusResponse
 
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -22,10 +21,10 @@ logger = logging.getLogger(__name__)
 #  Instance FastAPI
 # =========================================================
 app = FastAPI(
-    title=settings.app_name,
+    title=get_settings().app_name,
     description="API de génération de rapports asynchrones via Celery",
     version="0.1.0",
-    debug=settings.debug,
+    debug=get_settings().debug,
 )
 
 
@@ -37,10 +36,9 @@ def health_check():
     """Vérifie que l'API est vivante."""
     return {
         "status": "ok",
-        "app": settings.app_name,
+        "app": get_settings().app_name,
         "version": "0.1.0",
     }
-
 
 
 # =========================================================
@@ -48,7 +46,7 @@ def health_check():
 # =========================================================
 @app.get(
     "/reports",
-    response_model=List[ReportResponse],
+    response_model=list[ReportResponse],
     tags=["reports"],
     summary="Lister tous les rapports",
 )
@@ -58,13 +56,7 @@ def list_reports(
     db: Session = Depends(get_db),
 ):
     """Liste paginée des rapports, plus récents en premier."""
-    reports = (
-        db.query(Report)
-        .order_by(Report.created_at.desc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
+    reports = db.query(Report).order_by(Report.created_at.desc()).offset(skip).limit(limit).all()
     return reports
 
 
@@ -99,12 +91,12 @@ def create_report(
 
     # 3. Déclencher la tâche Celery
     from app.tasks import generate_report
+
     generate_report.delay(report.id)
     logger.info(f"📨 Tâche Celery envoyée pour le rapport {report.id}")
 
     # 4. Retourner — FastAPI convertit en ReportResponse via from_attributes
     return report
-
 
 
 # =========================================================
@@ -123,7 +115,7 @@ def get_report_status(
 ):
     """Endpoint léger à poller côté client pour savoir si le rapport est prêt."""
     report = db.query(Report).filter(Report.id == report_id).first()
-    if report is None: 
+    if report is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Rapport {report_id} introuvable",
@@ -211,7 +203,7 @@ def retry_report(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=f"Retry impossible : le rapport est en statut '{report.status.value}', "
-                   f"seul un rapport FAILED peut être relancé",
+            f"seul un rapport FAILED peut être relancé",
         )
 
     # 3. Réinitialiser les champs du rapport
@@ -224,11 +216,13 @@ def retry_report(
 
     # 4. Relancer la tâche Celery
     from app.tasks import generate_report
+
     generate_report.delay(report.id)
     logger.info(f"🔁 Retry du rapport {report.id} déclenché")
 
     # 5. Retourner le rapport remis à PENDING
     return report
+
 
 # =========================================================
 #  Détail d'un rapport

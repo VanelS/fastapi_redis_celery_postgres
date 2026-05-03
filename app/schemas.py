@@ -2,8 +2,10 @@
 Schémas Pydantic : contrats d'entrée/sortie de l'API.
 Séparés volontairement des modèles SQLAlchemy (models.py).
 """
+
 from datetime import datetime
-from pydantic import BaseModel, Field, ConfigDict
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models import ReportStatus
 
@@ -33,6 +35,7 @@ class ReportBase(BaseModel):
 # =========================================================
 class ReportCreate(ReportBase):
     """Payload d'entrée pour POST /reports."""
+
     pass  # Rien à ajouter pour l'instant, mais on garde la classe pour l'évolution
 
 

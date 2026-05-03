@@ -1,7 +1,7 @@
 """
 Tâches Celery — fonctions exécutées en arrière-plan par le worker.
 """
-import os
+
 import time
 from datetime import datetime
 from pathlib import Path
@@ -10,11 +10,10 @@ from celery.utils.log import get_task_logger
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 
-from app.config import settings
+from app.config import get_settings
 from app.database import SessionLocal
 from app.models import Report, ReportStatus
 from app.worker import celery_app
-
 
 logger = get_task_logger(__name__)
 
@@ -24,9 +23,9 @@ logger = get_task_logger(__name__)
 # =========================================================
 @celery_app.task(
     name="app.tasks.generate_report",
-    bind=True,                         # Donne accès à self (retries, task_id, etc.)
+    bind=True,  # Donne accès à self (retries, task_id, etc.)
     max_retries=3,
-    default_retry_delay=10,            # 10 sec entre chaque retry
+    default_retry_delay=10,  # 10 sec entre chaque retry
 )
 def generate_report(self, report_id: str) -> dict:
     """
@@ -56,10 +55,10 @@ def generate_report(self, report_id: str) -> dict:
         # --- 2. Faire le boulot ---
         # On simule une opération lourde (30 sec) + génération PDF
         logger.info(f"📊 Traitement du rapport '{report.title}'...")
-        time.sleep(30)   # ← simule une grosse requête SQL / agrégation
+        time.sleep(30)  # ← simule une grosse requête SQL / agrégation
 
         # Créer le dossier de sortie
-        reports_dir = Path(settings.reports_dir)
+        reports_dir = Path(get_settings().reports_dir)
         reports_dir.mkdir(parents=True, exist_ok=True)
 
         # Générer un vrai PDF avec reportlab
@@ -86,7 +85,7 @@ def generate_report(self, report_id: str) -> dict:
             db.commit()
 
         # Retry si on n'a pas épuisé les tentatives
-        raise self.retry(exc=exc, countdown=10)
+        raise self.retry(exc=exc, countdown=10) from exec
 
     finally:
         db.close()
@@ -120,7 +119,9 @@ def _generate_pdf(file_path: Path, report: Report) -> None:
     c.setFont("Helvetica-Bold", 13)
     c.drawString(50, y - 40, "Résumé exécutif")
     c.setFont("Helvetica", 10)
-    c.drawString(50, y - 60, "Ceci est un rapport de démonstration pour le projet FastAPI + Celery.")
+    c.drawString(
+        50, y - 60, "Ceci est un rapport de démonstration pour le projet FastAPI + Celery."
+    )
 
     c.showPage()
     c.save()

@@ -1,0 +1,36 @@
+[tool.ruff]
+# Longueur max d'une ligne
+line-length = 100
+
+# Cibler Python 3.11
+target-version = "py311"
+
+# Dossiers à analyser
+src = ["app", "tests"]
+
+# Dossiers à exclure
+extend-exclude = [
+    "alembic/versions",   # migrations auto-générées
+    "venv",
+]
+
+[tool.ruff.lint]
+# Règles à activer
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort (tri des imports)
+    "B",   # bugbear (anti-patterns)
+    "UP",  # pyupgrade (Python moderne)
+    "W",   # warnings
+]
+
+# Ignorer spécifiquement
+ignore = [
+    "E501",   # line too long (déjà géré par line-length)
+     "B008",   # function call in default arg (faux positif avec FastAPI Depends)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Les __init__.py ont le droit aux imports "non utilisés"
+"__init__.py" = ["F401"]

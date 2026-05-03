@@ -38,9 +38,12 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Lib runtime pour psycopg2 (libpq, version "simple", pas "-dev")
+# Libs runtime :
+#  - libpq5 : pour psycopg2
+#  - gosu   : pour basculer en non-root depuis l'entrypoint
 RUN apt-get update && apt-get install -y --no-install-recommends \
       libpq5 \
+      gosu \
     && rm -rf /var/lib/apt/lists/*
 
 # Créer un user non-root
@@ -50,7 +53,7 @@ RUN groupadd --system appgroup \
 # Copier le venv depuis le stage builder
 COPY --from=builder /opt/venv /opt/venv
 
-# Créer le dossier reports (en root)
+# Créer le dossier reports
 RUN mkdir -p /app/reports
 
 # Copier le code
@@ -58,12 +61,18 @@ COPY ./app ./app
 COPY ./alembic ./alembic
 COPY alembic.ini* ./
 
+# Copier l'entrypoint
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # Donner la propriété à appuser
 RUN chown -R appuser:appgroup /app /opt/venv
 
-# Bascule en non-root
-USER appuser
+# ⚠️ PAS DE `USER appuser` ici !
+# On reste root pour que l'entrypoint puisse chown le volume.
+# La bascule en appuser se fait DANS l'entrypoint via gosu.
 
 EXPOSE 8000
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

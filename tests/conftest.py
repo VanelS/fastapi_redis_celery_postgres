@@ -1,15 +1,16 @@
 """
 Fixtures partagées pour tous les tests.
 """
-import pytest
+
 from unittest.mock import patch
+
+import pytest
+from app.database import Base, get_db
+from app.main import app
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app.main import app
-from app.database import Base, get_db
 
 
 # =========================================================
@@ -55,6 +56,7 @@ def db_session():
 @pytest.fixture
 def client(db_session):
     """TestClient FastAPI avec BD SQLite à la place de PostgreSQL."""
+
     def override_get_db():
         try:
             yield db_session

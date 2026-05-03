@@ -1,5 +1,5 @@
 """Tests de GET /reports/{id}/download."""
-from pathlib import Path
+
 from app.models import Report, ReportStatus
 
 

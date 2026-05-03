@@ -1,20 +1,24 @@
 """
 Modèles SQLAlchemy : tables de la base de données.
 """
+
+import uuid
 from datetime import datetime
 from enum import Enum as PyEnum
-from sqlalchemy import String, DateTime, Enum, JSON, Text
+
+from sqlalchemy import JSON, DateTime, Enum, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
-import uuid
 
 from app.database import Base
 
+
 class ReportStatus(str, PyEnum):
     """États possibles d'un rapport dans son cycle de vie."""
-    PENDING = "pending"        # Créé, en attente du worker
+
+    PENDING = "pending"  # Créé, en attente du worker
     PROCESSING = "processing"  # Worker est dessus
-    COMPLETED = "completed"    # Rapport prêt, file_path rempli
-    FAILED = "failed"          # Erreur, voir error_message
+    COMPLETED = "completed"  # Rapport prêt, file_path rempli
+    FAILED = "failed"  # Erreur, voir error_message
 
 
 class Report(Base):
@@ -22,6 +26,7 @@ class Report(Base):
     Représente un rapport demandé par un utilisateur.
     Cycle de vie : PENDING → PROCESSING → COMPLETED (ou FAILED)
     """
+
     __tablename__ = "reports"
 
     # --- Identifiant ---

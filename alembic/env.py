@@ -1,29 +1,24 @@
 # --- Imports de notre app ---
-import os
 import sys
 from pathlib import Path
 
 # Rendre les modules app.* importables
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
-from app.config import settings
-from app.database import Base
-from app import models  # noqa: F401  # Charge tous les modèles pour qu'ils soient connus
-
-
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
+from app import models  # noqa: F401  # Charge tous les modèles pour qu'ils soient connus
+from app.config import get_settings
+from app.database import Base
+from sqlalchemy import engine_from_config, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
 # Injecter l'URL de la BD depuis notre config (.env)
-config.set_main_option("sqlalchemy.url", settings.database_url)
+config.set_main_option("sqlalchemy.url", get_settings().database_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -81,9 +76,7 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(
-            connection=connection, target_metadata=target_metadata
-        )
+        context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():
             context.run_migrations()

@@ -1,8 +1,8 @@
 """Tests unitaires des schemas Pydantic."""
-import pytest
-from pydantic import ValidationError
 
+import pytest
 from app.schemas import ReportCreate
+from pydantic import ValidationError
 
 
 def test_report_create_valid():
