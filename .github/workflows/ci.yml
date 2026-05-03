@@ -9,10 +9,38 @@ on:
   pull_request:
     branches: [main]
 
-# =========================================================
-#  Les jobs (ici un seul : tests)
-# =========================================================
+
 jobs:
+
+  # =======================================================
+  #  Job 1 : Lint (vérification du style)
+  # =======================================================
+  lint:
+    name: 🎨 Lint with Ruff
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install Ruff
+        run: pip install ruff==0.7.1
+
+      - name: 🔍 Run Ruff linter
+        run: ruff check .
+
+      - name: 🎨 Check formatting
+        run: ruff format --check .
+
+  # =========================================================
+  #  Les jobs (ici un seul : tests)
+  # =========================================================
   tests:
     name: 🧪 Run tests
     runs-on: ubuntu-latest
