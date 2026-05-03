@@ -37,4 +37,12 @@ jobs:
 
       # --- 4. Lancer les tests ---
       - name: 🧪 Run pytest
+        env:
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_pass
+          POSTGRES_DB: test_db
+          POSTGRES_HOST: localhost
+          POSTGRES_PORT: 5432
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
         run: pytest -v

@@ -1,45 +1,67 @@
 # syntax=docker/dockerfile:1.6
 
 # =========================================================
-#  Image de base : Python 3.11 slim (Debian minimal)
+#  STAGE 1 : BUILDER — compile les deps Python
 # =========================================================
-FROM python:3.11-slim
+FROM python:3.11-slim AS builder
 
-# --- Variables d'environnement Python ---
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# --- Dossier de travail dans le conteneur ---
-WORKDIR /app
+WORKDIR /build
 
-# --- Dépendances système (en root) ---
+# Outils de compilation pour psycopg2 etc.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       gcc \
       libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Créer un utilisateur non-root ---
-RUN groupadd --system appgroup \
-    && useradd --system --gid appgroup --create-home --shell /bin/bash appuser
+# Créer un venv isolé pour les deps Python
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# --- Créer le dossier reports MAINTENANT, en root ---
-RUN mkdir -p /app/reports
-
-# --- Installation des deps Python (en root, dans /usr/local) ---
+# Installer les deps Python dans le venv
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# --- Copier le code (toujours en root, sans --chown) ---
+
+# =========================================================
+#  STAGE 2 : RUNTIME — image finale légère
+# =========================================================
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+WORKDIR /app
+
+# Lib runtime pour psycopg2 (libpq, version "simple", pas "-dev")
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Créer un user non-root
+RUN groupadd --system appgroup \
+    && useradd --system --gid appgroup --create-home --shell /bin/bash appuser
+
+# Copier le venv depuis le stage builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Créer le dossier reports (en root)
+RUN mkdir -p /app/reports
+
+# Copier le code
 COPY ./app ./app
 COPY ./alembic ./alembic
 COPY alembic.ini* ./
 
-# --- UNE SEULE opération chown en fin, pour tout /app ---
-RUN chown -R appuser:appgroup /app
+# Donner la propriété à appuser
+RUN chown -R appuser:appgroup /app /opt/venv
 
-# --- Bascule en non-root pour les processus suivants ---
+# Bascule en non-root
 USER appuser
 
 EXPOSE 8000
