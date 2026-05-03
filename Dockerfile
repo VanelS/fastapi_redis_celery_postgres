@@ -14,26 +14,34 @@ ENV PYTHONUNBUFFERED=1 \
 # --- Dossier de travail dans le conteneur ---
 WORKDIR /app
 
-# --- Dépendances système nécessaires à psycopg2 + reportlab ---
+# --- Dépendances système (en root) ---
 RUN apt-get update && apt-get install -y --no-install-recommends \
       gcc \
       libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Copier et installer les deps Python (couche cachée si inchangé) ---
+# --- Créer un utilisateur non-root ---
+RUN groupadd --system appgroup \
+    && useradd --system --gid appgroup --create-home --shell /bin/bash appuser
+
+# --- Créer le dossier reports MAINTENANT, en root ---
+RUN mkdir -p /app/reports
+
+# --- Installation des deps Python (en root, dans /usr/local) ---
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# --- Copier le code de l'app ---
+# --- Copier le code (toujours en root, sans --chown) ---
 COPY ./app ./app
 COPY ./alembic ./alembic
 COPY alembic.ini* ./
 
-# --- Créer le dossier de sortie des rapports ---
-RUN mkdir -p /app/reports
+# --- UNE SEULE opération chown en fin, pour tout /app ---
+RUN chown -R appuser:appgroup /app
 
-# --- Exposer le port FastAPI (documentation, ne publie pas) ---
+# --- Bascule en non-root pour les processus suivants ---
+USER appuser
+
 EXPOSE 8000
 
-# --- Commande par défaut (sera overridée par docker-compose pour Celery/Flower) ---
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
