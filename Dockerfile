@@ -23,6 +23,8 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Installer les deps Python dans le venv
+# TODO : pensez à utiliser UV pour l'installation des dépendances, c'est plus rapide et plus fiable que pip dans un Dockerfile
+
 COPY requirements.txt .
 RUN pip install --upgrade pip && pip install -r requirements.txt
 

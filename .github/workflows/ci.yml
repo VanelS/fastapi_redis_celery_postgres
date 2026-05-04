@@ -2,19 +2,23 @@ name: CI
 
 # =========================================================
 #  Quand déclencher le workflow
+# TODO : prendre ne compte la branche de develop et le branches de features ou fix, ...
 # =========================================================
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop]
 
+  branches:
+    - develop
 
 jobs:
 
   # =======================================================
   #  Job 1 : Lint (vérification du style)
   # =======================================================
+  # utiliser aussi mypy pour la vérification de types statique, c'est un super outil pour attraper les bugs avant même d'exécuter le code
   lint:
     name: 🎨 Lint with Ruff
     runs-on: ubuntu-latest
@@ -68,6 +72,8 @@ jobs:
           cache: "pip"
 
       # --- 3. Installer les dépendances de dev ---
+      # TODO : pensez à utiliser UV pour l'installation des dépendances, c'est plus rapide et plus fiable que pip dans un workflow GitHub Actions
+      # TODO : vous pouvez aussi utiliser un cache pour les dépendances, ça accélère les runs après le premier
       - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
